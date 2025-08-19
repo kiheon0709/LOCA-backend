@@ -1,5 +1,10 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+import os
+
+# API 라우터들 import
+from .api import keywords, photos, search, contests, users
 
 app = FastAPI(
     title="LOCA Backend",
@@ -15,6 +20,17 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# 정적 파일 서빙 (업로드된 이미지)
+if os.path.exists("uploads"):
+    app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+
+# API 라우터 등록
+app.include_router(keywords.router)
+app.include_router(photos.router)
+app.include_router(search.router)
+app.include_router(contests.router)
+app.include_router(users.router)
 
 @app.get("/")
 async def root():

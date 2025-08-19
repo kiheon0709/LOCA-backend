@@ -8,3 +8,4 @@ passlib==1.7.4
 python-dotenv==1.0.0
 alembic==1.12.1
 pydantic==2.5.0
+Pillow==11.3.0
