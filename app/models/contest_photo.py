@@ -17,8 +17,8 @@ class ContestPhoto(Base):
     submitted_at = Column(DateTime(timezone=True), server_default=func.now())
     
     # 관계 설정
-    contest = relationship("Contest", back_populates="contest_photos")
-    user = relationship("User", back_populates="contest_photos")
+    contest = relationship("Contest", back_populates="contest_photos", foreign_keys=[contest_id])
+    user = relationship("User")
     
     def __repr__(self):
         return f"<ContestPhoto(id={self.id}, contest_id={self.contest_id}, user_id={self.user_id})>"

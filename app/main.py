@@ -4,11 +4,13 @@ from fastapi.staticfiles import StaticFiles
 import os
 
 # API 라우터들 import
-from .api import keywords, photos, search, contests, users
+from .api import keywords, photos, search, users
+# 공모 기능은 나중에 구현 예정
+# from .api import contests
 
 app = FastAPI(
     title="LOCA Backend",
-    description="대전 지역 숨은 명소 발굴을 위한 AI 기반 지역 활성화 플랫폼",
+    description="대전 지역 숨은 명소 발굴을 위한 AI 기반 크라우드 소싱 플랫폼",
     version="1.0.0"
 )
 
@@ -29,8 +31,9 @@ if os.path.exists("uploads"):
 app.include_router(keywords.router)
 app.include_router(photos.router)
 app.include_router(search.router)
-app.include_router(contests.router)
 app.include_router(users.router)
+# 공모 기능은 나중에 구현 예정
+# app.include_router(contests.router)
 
 @app.get("/")
 async def root():

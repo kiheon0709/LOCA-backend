@@ -66,13 +66,25 @@ async def upload_photo(
     db.commit()
     db.refresh(photo)
     
-    # AI 분석 (백그라운드에서 비동기 처리)
+    # AI 분석을 별도 세션에서 처리 (데이터베이스 잠금 방지)
     try:
         ai_description = await ai_service.analyze_image_from_path(file_path)
         if ai_description:
-            photo.ai_description = ai_description
-            db.commit()
-            db.refresh(photo)
+            # 새로운 세션으로 AI 분석 결과 업데이트
+            from ..database import SessionLocal
+            update_db = SessionLocal()
+            try:
+                update_photo = update_db.query(Photo).filter(Photo.id == photo.id).first()
+                if update_photo:
+                    update_photo.ai_description = ai_description
+                    update_db.commit()
+                    # 원래 세션의 객체도 업데이트
+                    photo.ai_description = ai_description
+            except Exception as update_error:
+                update_db.rollback()
+                print(f"AI 분석 결과 업데이트 중 오류: {update_error}")
+            finally:
+                update_db.close()
     except Exception as e:
         print(f"AI 분석 중 오류: {e}")
     

@@ -24,8 +24,8 @@ class Contest(Base):
     
     # 관계 설정
     user = relationship("User", back_populates="contests")
-    contest_photos = relationship("ContestPhoto", back_populates="contest")
-    selected_photo = relationship("ContestPhoto", foreign_keys=[selected_photo_id])
+    contest_photos = relationship("ContestPhoto", back_populates="contest", foreign_keys="[ContestPhoto.contest_id]")
+    selected_photo = relationship("ContestPhoto", foreign_keys=[selected_photo_id], post_update=True)
     
     def __repr__(self):
         return f"<Contest(id={self.id}, title='{self.title}', points={self.points}, status={self.status.value})>"

@@ -5,10 +5,16 @@ from sqlalchemy.orm import sessionmaker
 # SQLite 데이터베이스 URL
 SQLALCHEMY_DATABASE_URL = "sqlite:///./loca.db"
 
-# SQLite 엔진 생성
+# SQLite 엔진 생성 (동시성 개선)
 engine = create_engine(
     SQLALCHEMY_DATABASE_URL, 
-    connect_args={"check_same_thread": False}  # SQLite 전용 설정
+    connect_args={
+        "check_same_thread": False,  # SQLite 전용 설정
+        "timeout": 30,  # 타임아웃 설정
+        "isolation_level": "IMMEDIATE"  # 즉시 잠금 모드
+    },
+    pool_pre_ping=True,  # 연결 상태 확인
+    pool_recycle=300  # 5분마다 연결 재생성
 )
 
 # 세션 팩토리 생성
