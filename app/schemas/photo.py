@@ -38,3 +38,6 @@ class PhotoResponse(BaseModel):
     ai_description: Optional[str] = None
     uploaded_at: datetime
     like_count: int = 0
+    
+    class Config:
+        from_attributes = True
