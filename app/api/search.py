@@ -47,8 +47,17 @@ async def search_photos(
     for photo in photos:
         from ..models import Like
         like_count = db.query(Like).filter(Like.photo_id == photo.id).count()
+        
+        # 이미지 경로를 전체 URL로 변환
+        image_url = f"http://127.0.0.1:8000/{photo.image_path}" if photo.image_path else None
+        
+        # photo.__dict__에서 image_path를 제거하고 새로운 image_url 사용
+        photo_dict = photo.__dict__.copy()
+        photo_dict.pop('image_path', None)
+        
         result.append(PhotoResponse(
-            **photo.__dict__,
+            **photo_dict,
+            image_path=image_url,
             like_count=like_count
         ))
     

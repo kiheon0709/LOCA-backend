@@ -360,8 +360,16 @@ async def get_photos(
         user = db.query(User).filter(User.id == photo.user_id).first()
         user_nickname = user.nickname if user else "알 수 없는 사용자"
         
+        # 이미지 경로를 전체 URL로 변환
+        image_url = f"http://127.0.0.1:8000/{photo.image_path}" if photo.image_path else None
+        
+        # photo.__dict__에서 image_path를 제거하고 새로운 image_url 사용
+        photo_dict = photo.__dict__.copy()
+        photo_dict.pop('image_path', None)
+        
         result.append(PhotoResponse(
-            **photo.__dict__,
+            **photo_dict,
+            image_path=image_url,
             user_nickname=user_nickname,
             like_count=like_count
         ))
@@ -377,8 +385,16 @@ async def get_photo(photo_id: int, db: Session = Depends(get_db)):
     
     like_count = db.query(Like).filter(Like.photo_id == photo.id).count()
     
+    # 이미지 경로를 전체 URL로 변환
+    image_url = f"http://127.0.0.1:8000/{photo.image_path}" if photo.image_path else None
+    
+    # photo.__dict__에서 image_path를 제거하고 새로운 image_url 사용
+    photo_dict = photo.__dict__.copy()
+    photo_dict.pop('image_path', None)
+    
     return PhotoResponse(
-        **photo.__dict__,
+        **photo_dict,
+        image_path=image_url,
         like_count=like_count
     )
 
