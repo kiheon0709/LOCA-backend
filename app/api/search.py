@@ -4,7 +4,7 @@ from sqlalchemy import or_, func
 from typing import List, Optional
 
 from ..database import get_db
-from ..models import Photo, Keyword
+from ..models import Photo, Keyword, User
 from ..schemas.photo import PhotoResponse
 
 router = APIRouter(prefix="/search", tags=["search"])
@@ -17,15 +17,16 @@ async def search_photos(
     offset: int = Query(0, description="오프셋"),
     db: Session = Depends(get_db)
 ):
-    """AI 설명과 키워드를 기반으로 사진을 검색합니다."""
+    """AI 설명, 키워드, 위치정보를 기반으로 사진을 검색합니다."""
     
     # 기본 쿼리
     query = db.query(Photo)
     
-    # 검색 조건: AI 설명이나 키워드에 검색어가 포함된 경우
+    # 검색 조건: AI 설명, 키워드, 위치정보에 검색어가 포함된 경우
     search_filter = or_(
         Photo.ai_description.contains(q),
-        Keyword.keyword.contains(q)
+        Keyword.keyword.contains(q),
+        Photo.location.contains(q)
     )
     
     query = query.join(Keyword).filter(search_filter)
@@ -42,11 +43,15 @@ async def search_photos(
     # 페이징
     photos = query.offset(offset).limit(limit).all()
     
-    # 각 사진의 좋아요 수 계산
+    # 각 사진의 좋아요 수 계산 및 유저 정보 포함
     result = []
     for photo in photos:
         from ..models import Like
         like_count = db.query(Like).filter(Like.photo_id == photo.id).count()
+        
+        # 유저 정보 가져오기
+        user = db.query(User).filter(User.id == photo.user_id).first()
+        user_nickname = user.nickname if user else "알 수 없는 사용자"
         
         # 이미지 경로를 전체 URL로 변환
         image_url = f"http://127.0.0.1:8000/{photo.image_path}" if photo.image_path else None
@@ -58,6 +63,7 @@ async def search_photos(
         result.append(PhotoResponse(
             **photo_dict,
             image_path=image_url,
+            user_nickname=user_nickname,
             like_count=like_count
         ))
     
