@@ -351,12 +351,18 @@ async def get_photos(
     
     photos = query.order_by(Photo.uploaded_at.desc()).offset(offset).limit(limit).all()
     
-    # 각 사진의 좋아요 수 계산
+    # 각 사진의 좋아요 수 계산 및 유저 정보 포함
     result = []
     for photo in photos:
         like_count = db.query(Like).filter(Like.photo_id == photo.id).count()
+        
+        # 유저 정보 가져오기
+        user = db.query(User).filter(User.id == photo.user_id).first()
+        user_nickname = user.nickname if user else "알 수 없는 사용자"
+        
         result.append(PhotoResponse(
             **photo.__dict__,
+            user_nickname=user_nickname,
             like_count=like_count
         ))
     
@@ -415,3 +421,34 @@ async def unlike_photo(photo_id: int, user_id: int, db: Session = Depends(get_db
     db.commit()
     
     return {"message": "좋아요가 취소되었습니다."}
+
+@router.delete("/{photo_id}")
+async def delete_photo(photo_id: int, db: Session = Depends(get_db)):
+    """사진을 삭제합니다."""
+    # 사진 존재 확인
+    photo = db.query(Photo).filter(Photo.id == photo_id).first()
+    if not photo:
+        raise HTTPException(status_code=404, detail="사진을 찾을 수 없습니다.")
+    
+    try:
+        # 파일 시스템에서 이미지 파일 삭제
+        if os.path.exists(photo.image_path):
+            os.remove(photo.image_path)
+            print(f"이미지 파일 삭제 완료: {photo.image_path}")
+        
+        # 좋아요 데이터 삭제
+        likes = db.query(Like).filter(Like.photo_id == photo_id).all()
+        for like in likes:
+            db.delete(like)
+        
+        # 사진 데이터 삭제
+        db.delete(photo)
+        db.commit()
+        
+        print(f"사진 삭제 완료: photo_id={photo_id}")
+        return {"message": "사진이 삭제되었습니다."}
+        
+    except Exception as e:
+        db.rollback()
+        print(f"사진 삭제 중 오류: {e}")
+        raise HTTPException(status_code=500, detail=f"사진 삭제 중 오류가 발생했습니다: {str(e)}")

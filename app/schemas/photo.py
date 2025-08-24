@@ -30,6 +30,7 @@ class Photo(PhotoBase):
 class PhotoResponse(BaseModel):
     id: int
     user_id: int
+    user_nickname: str  # 유저 닉네임 추가
     keyword_id: int
     image_path: str
     location: Optional[str] = None
