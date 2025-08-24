@@ -4,6 +4,12 @@
 uploads/
 logs/
 
+# Security files
+*.pem
+*.key
+*.p12
+*.pfx
+
 
 # Databases
 loca.db
