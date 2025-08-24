@@ -22,6 +22,15 @@ async def get_user(user_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="유저를 찾을 수 없습니다.")
     return user
 
+@router.get("/{user_id}/points")
+async def get_user_points(user_id: int, db: Session = Depends(get_db)):
+    """유저의 포인트를 조회합니다."""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="유저를 찾을 수 없습니다.")
+    
+    return {"points": user.points}
+
 @router.put("/{user_id}/points")
 async def update_user_points(
     user_id: int, 

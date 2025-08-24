@@ -4,9 +4,7 @@ from fastapi.staticfiles import StaticFiles
 import os
 
 # API 라우터들 import
-from .api import keywords, photos, search, users
-# 공모 기능은 나중에 구현 예정
-# from .api import contests
+from .api import keywords, photos, search, users, contests
 
 app = FastAPI(
     title="LOCA Backend",
@@ -32,8 +30,7 @@ app.include_router(keywords.router)
 app.include_router(photos.router)
 app.include_router(search.router)
 app.include_router(users.router)
-# 공모 기능은 나중에 구현 예정
-# app.include_router(contests.router)
+app.include_router(contests.router)
 
 @app.get("/")
 async def root():

@@ -15,8 +15,7 @@ class User(Base):
     # 관계 설정
     photos = relationship("Photo", back_populates="user")
     likes = relationship("Like", back_populates="user")
-    # 공모 기능은 나중에 구현 예정
-    # contests = relationship("Contest", back_populates="user")
+    contests = relationship("Contest", back_populates="user")
     
     def __repr__(self):
         return f"<User(id={self.id}, nickname='{self.nickname}', points={self.points})>"

@@ -4,6 +4,7 @@
 uploads/
 logs/
 
+
 # Databases
 loca.db
 *.db

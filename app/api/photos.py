@@ -330,7 +330,23 @@ async def upload_photo_from_asset(
         import traceback
         print(f"AI 분석 오류 스택 트레이스: {traceback.format_exc()}")
     
-    return PhotoResponse.from_orm(photo)
+    # 유저 정보 가져오기
+    user = db.query(User).filter(User.id == photo.user_id).first()
+    user_nickname = user.nickname if user else "알 수 없는 사용자"
+    
+    # 이미지 경로를 전체 URL로 변환
+    image_url = f"http://127.0.0.1:8000/{photo.image_path}" if photo.image_path else None
+    
+    # photo.__dict__에서 image_path를 제거하고 새로운 image_url 사용
+    photo_dict = photo.__dict__.copy()
+    photo_dict.pop('image_path', None)
+    
+    return PhotoResponse(
+        **photo_dict,
+        image_path=image_url,
+        user_nickname=user_nickname,
+        like_count=0  # 새로 업로드된 사진이므로 좋아요 수는 0
+    )
 
 @router.get("/", response_model=List[PhotoResponse])
 async def get_photos(
