@@ -14,46 +14,7 @@ router = APIRouter(prefix="/contests", tags=["contests"])
 
 # 업로드 디렉토리 설정
 UPLOAD_DIR = "uploads"
-CONTESTS_DIR = os.path.join(UPLOAD_DIR, "contests")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
-os.makedirs(CONTESTS_DIR, exist_ok=True)
-
-def get_contest_upload_dir(contest_id: int) -> str:
-    """공모별 업로드 디렉토리를 생성하고 반환합니다."""
-    contest_dir = os.path.join(CONTESTS_DIR, str(contest_id))
-    os.makedirs(contest_dir, exist_ok=True)
-    return contest_dir
-
-def migrate_existing_contest_photos(db: Session):
-    """기존에 uploads/ 디렉토리에 저장된 공모 사진들을 공모별로 분류합니다."""
-    try:
-        # 기존 uploads 디렉토리의 모든 파일 확인
-        if not os.path.exists(UPLOAD_DIR):
-            return
-        
-        for filename in os.listdir(UPLOAD_DIR):
-            if filename.startswith('contest_') and filename.endswith(('.jpg', '.jpeg', '.png', '.gif')):
-                file_path = os.path.join(UPLOAD_DIR, filename)
-                
-                # 데이터베이스에서 해당 파일 경로를 가진 공모 사진 찾기
-                contest_photo = db.query(ContestPhoto).filter(ContestPhoto.image_path == file_path).first()
-                if contest_photo:
-                    # 공모별 디렉토리로 이동
-                    contest_dir = get_contest_upload_dir(contest_photo.contest_id)
-                    new_file_path = os.path.join(contest_dir, filename)
-                    
-                    # 파일 이동
-                    if os.path.exists(file_path) and not os.path.exists(new_file_path):
-                        shutil.move(file_path, new_file_path)
-                        
-                        # 데이터베이스 경로 업데이트
-                        contest_photo.image_path = new_file_path
-                        db.commit()
-                        print(f"공모 사진 마이그레이션 완료: {filename} -> {new_file_path}")
-                        
-    except Exception as e:
-        print(f"공모 사진 마이그레이션 중 오류: {e}")
-        db.rollback()
 
 @router.post("/", response_model=ContestResponse)
 async def create_contest(
@@ -161,10 +122,9 @@ async def submit_contest_photo(
         raise HTTPException(status_code=404, detail="유저를 찾을 수 없습니다.")
     
     # 파일 저장
-    contest_upload_dir = get_contest_upload_dir(contest_id)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"photo_{user_id}_{timestamp}_{file.filename}"
-    file_path = os.path.join(contest_upload_dir, filename)
+    filename = f"contest_{contest_id}_{user_id}_{timestamp}_{file.filename}"
+    file_path = os.path.join(UPLOAD_DIR, filename)
     
     try:
         with open(file_path, "wb") as buffer:

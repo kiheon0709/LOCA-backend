@@ -32,6 +32,7 @@ async def startup_event():
     try:
         db = SessionLocal()
         photos.migrate_existing_photos(db)
+        contests.migrate_existing_contest_photos(db)
         db.close()
         print("기존 사진 마이그레이션 완료")
     except Exception as e:
