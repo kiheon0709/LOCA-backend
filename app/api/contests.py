@@ -68,10 +68,6 @@ async def create_contest(
     if not user:
         raise HTTPException(status_code=404, detail="유저를 찾을 수 없습니다.")
     
-    # 포인트 확인
-    if user.points < contest_data.points:
-        raise HTTPException(status_code=400, detail="포인트가 부족합니다.")
-    
     # 공모 생성
     contest_data_dict = contest_data.dict()
     
@@ -86,9 +82,6 @@ async def create_contest(
         **contest_data_dict,
         user_id=user_id
     )
-    
-    # 포인트 차감
-    user.points -= contest_data.points
     
     db.add(contest)
     db.commit()
@@ -126,6 +119,34 @@ async def get_contests(
             photo_count=photo_count
         ))
     
+    return result
+
+@router.get("/applied", response_model=List[ContestResponse])
+async def get_applied_contests(
+    user_id: int,
+    limit: int = 20,
+    offset: int = 0,
+    db: Session = Depends(get_db)
+):
+    """특정 유저가 사진을 제출하여 지원한 공모 목록을 조회합니다."""
+    # 유저 존재 확인
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="유저를 찾을 수 없습니다.")
+
+    # 해당 유저가 제출한 사진들의 공모 ID 목록 (중복 제거)
+    subquery = db.query(ContestPhoto.contest_id).filter(ContestPhoto.user_id == user_id).distinct().subquery()
+
+    contests = db.query(Contest).filter(Contest.id.in_(subquery)).order_by(Contest.created_at.desc()).offset(offset).limit(limit).all()
+
+    result: List[ContestResponse] = []
+    for contest in contests:
+        photo_count = db.query(ContestPhoto).filter(ContestPhoto.contest_id == contest.id).count()
+        result.append(ContestResponse(
+            **contest.__dict__,
+            photo_count=photo_count
+        ))
+
     return result
 
 @router.get("/{contest_id}", response_model=ContestResponse)
@@ -257,16 +278,66 @@ async def select_contest_photo(
     if not contest_photo:
         raise HTTPException(status_code=404, detail="사진을 찾을 수 없습니다.")
     
+    # 공모 주최자 포인트 확인
+    contest_owner = db.query(User).filter(User.id == user_id).first()
+    if not contest_owner:
+        raise HTTPException(status_code=404, detail="공모 주최자를 찾을 수 없습니다.")
+    
+    if contest_owner.points < contest.points:
+        raise HTTPException(status_code=400, detail="포인트가 부족합니다.")
+    
     # 공모 상태 업데이트
     contest.selected_photo_id = photo_id
     contest.status = ContestStatus.COMPLETED
     contest.completed_at = datetime.now()
     
-    # 포인트 지급
+    # 포인트 차감 및 지급
+    contest_owner.points -= contest.points  # 공모 주최자 포인트 차감
     winner = db.query(User).filter(User.id == contest_photo.user_id).first()
     if winner:
-        winner.points += contest.points
+        winner.points += contest.points  # 우승자 포인트 지급
     
     db.commit()
     
     return {"message": "사진이 선택되었고 포인트가 지급되었습니다."}
+
+@router.delete("/{contest_id}")
+async def delete_contest(
+    contest_id: int,
+    user_id: int,
+    db: Session = Depends(get_db)
+):
+    """공모를 삭제합니다. (마감된 공모만 삭제 가능)"""
+    
+    # 공모 존재 확인
+    contest = db.query(Contest).filter(Contest.id == contest_id).first()
+    if not contest:
+        raise HTTPException(status_code=404, detail="공모를 찾을 수 없습니다.")
+    
+    # 공모 주최자 확인
+    if contest.user_id != user_id:
+        raise HTTPException(status_code=403, detail="공모 주최자만 삭제할 수 있습니다.")
+    
+    # 마감된 공모만 삭제 가능
+    if contest.status != ContestStatus.COMPLETED:
+        raise HTTPException(status_code=400, detail="마감된 공모만 삭제할 수 있습니다.")
+    
+    # 공모에 제출된 사진들 삭제
+    contest_photos = db.query(ContestPhoto).filter(ContestPhoto.contest_id == contest_id).all()
+    for photo in contest_photos:
+        # 파일 삭제
+        if os.path.exists(photo.image_path):
+            os.remove(photo.image_path)
+        # 데이터베이스에서 삭제
+        db.delete(photo)
+    
+    # 공모 디렉토리 삭제
+    contest_dir = get_contest_upload_dir(contest_id)
+    if os.path.exists(contest_dir):
+        shutil.rmtree(contest_dir)
+    
+    # 공모 삭제
+    db.delete(contest)
+    db.commit()
+    
+    return {"message": "공모가 성공적으로 삭제되었습니다."}
