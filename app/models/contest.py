@@ -17,6 +17,7 @@ class Contest(Base):
     title = Column(String(200), nullable=False)
     description = Column(Text, nullable=False)
     points = Column(Integer, nullable=False)  # 공모에 걸린 포인트
+    deadline = Column(DateTime(timezone=True), nullable=True)  # 공모 마감일
     status = Column(Enum(ContestStatus), default=ContestStatus.ACTIVE)
     selected_photo_id = Column(Integer, ForeignKey("contest_photos.id"), nullable=True)  # 선택된 사진
     created_at = Column(DateTime(timezone=True), server_default=func.now())

@@ -12,6 +12,7 @@ class ContestBase(BaseModel):
     title: str
     description: str
     points: int
+    deadline: Optional[datetime] = None
 
 class ContestCreate(ContestBase):
     pass
@@ -20,6 +21,7 @@ class ContestUpdate(BaseModel):
     title: Optional[str] = None
     description: Optional[str] = None
     points: Optional[int] = None
+    deadline: Optional[datetime] = None
     status: Optional[ContestStatusEnum] = None
     selected_photo_id: Optional[int] = None
 
@@ -39,6 +41,7 @@ class ContestResponse(BaseModel):
     title: str
     description: str
     points: int
+    deadline: Optional[datetime] = None
     status: ContestStatusEnum
     user_id: int
     selected_photo_id: Optional[int] = None

@@ -73,8 +73,17 @@ async def create_contest(
         raise HTTPException(status_code=400, detail="포인트가 부족합니다.")
     
     # 공모 생성
+    contest_data_dict = contest_data.dict()
+    
+    # deadline이 문자열로 전달된 경우 datetime으로 변환
+    if contest_data_dict.get('deadline') and isinstance(contest_data_dict['deadline'], str):
+        try:
+            contest_data_dict['deadline'] = datetime.fromisoformat(contest_data_dict['deadline'].replace('Z', '+00:00'))
+        except ValueError:
+            raise HTTPException(status_code=400, detail="잘못된 날짜 형식입니다.")
+    
     contest = Contest(
-        **contest_data.dict(),
+        **contest_data_dict,
         user_id=user_id
     )
     
