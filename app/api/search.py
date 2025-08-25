@@ -53,8 +53,8 @@ async def search_photos(
         user = db.query(User).filter(User.id == photo.user_id).first()
         user_nickname = user.nickname if user else "알 수 없는 사용자"
         
-        # 이미지 경로를 전체 URL로 변환
-        image_url = f"http://127.0.0.1:8000/{photo.image_path}" if photo.image_path else None
+        # 이미지 경로를 상대경로로 유지
+        image_url = photo.image_path if photo.image_path else None
         
         # photo.__dict__에서 image_path를 제거하고 새로운 image_url 사용
         photo_dict = photo.__dict__.copy()

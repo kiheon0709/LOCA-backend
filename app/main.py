@@ -5,6 +5,7 @@ import os
 
 # API 라우터들 import
 from .api import keywords, photos, search, users, contests
+from .database import SessionLocal
 
 app = FastAPI(
     title="LOCA Backend",
@@ -24,6 +25,17 @@ app.add_middleware(
 # 정적 파일 서빙 (업로드된 이미지)
 if os.path.exists("uploads"):
     app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+
+# 서버 시작 시 기존 사진 마이그레이션
+@app.on_event("startup")
+async def startup_event():
+    try:
+        db = SessionLocal()
+        photos.migrate_existing_photos(db)
+        db.close()
+        print("기존 사진 마이그레이션 완료")
+    except Exception as e:
+        print(f"마이그레이션 중 오류: {e}")
 
 # API 라우터 등록
 app.include_router(keywords.router)

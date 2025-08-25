@@ -17,7 +17,46 @@ router = APIRouter(prefix="/photos", tags=["photos"])
 
 # 업로드 디렉토리 설정
 UPLOAD_DIR = "uploads"
+KEYWORDS_DIR = os.path.join(UPLOAD_DIR, "keywords")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+os.makedirs(KEYWORDS_DIR, exist_ok=True)
+
+def get_keyword_upload_dir(keyword_id: int) -> str:
+    """키워드별 업로드 디렉토리를 생성하고 반환합니다."""
+    keyword_dir = os.path.join(KEYWORDS_DIR, str(keyword_id))
+    os.makedirs(keyword_dir, exist_ok=True)
+    return keyword_dir
+
+def migrate_existing_photos(db: Session):
+    """기존에 uploads/ 디렉토리에 저장된 사진들을 키워드별로 분류합니다."""
+    try:
+        # 기존 uploads 디렉토리의 모든 파일 확인
+        if not os.path.exists(UPLOAD_DIR):
+            return
+        
+        for filename in os.listdir(UPLOAD_DIR):
+            if filename.endswith(('.jpg', '.jpeg', '.png', '.gif')):
+                file_path = os.path.join(UPLOAD_DIR, filename)
+                
+                # 데이터베이스에서 해당 파일 경로를 가진 사진 찾기
+                photo = db.query(Photo).filter(Photo.image_path == file_path).first()
+                if photo:
+                    # 키워드별 디렉토리로 이동
+                    keyword_dir = get_keyword_upload_dir(photo.keyword_id)
+                    new_file_path = os.path.join(keyword_dir, filename)
+                    
+                    # 파일 이동
+                    if os.path.exists(file_path) and not os.path.exists(new_file_path):
+                        shutil.move(file_path, new_file_path)
+                        
+                        # 데이터베이스 경로 업데이트
+                        photo.image_path = new_file_path
+                        db.commit()
+                        print(f"파일 마이그레이션 완료: {filename} -> {new_file_path}")
+                        
+    except Exception as e:
+        print(f"파일 마이그레이션 중 오류: {e}")
+        db.rollback()
 
 @router.post("/upload", response_model=PhotoResponse)
 async def upload_photo(
@@ -48,10 +87,11 @@ async def upload_photo(
     
     print(f"유저와 키워드 확인 완료: user={user.nickname}, keyword={keyword.keyword}")
     
-    # 파일 저장
+    # 키워드별 디렉토리에 파일 저장
+    keyword_upload_dir = get_keyword_upload_dir(keyword_id)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     filename = f"{user_id}_{timestamp}_{file.filename}"
-    file_path = os.path.join(UPLOAD_DIR, filename)
+    file_path = os.path.join(keyword_upload_dir, filename)
     
     try:
         # 파일 내용을 먼저 읽어서 저장
@@ -245,10 +285,11 @@ async def upload_photo_from_asset(
             print("오류: 파일 내용이 비어있습니다!")
             raise HTTPException(status_code=400, detail="빈 파일입니다.")
         
-        # 파일 저장
+        # 키워드별 디렉토리에 파일 저장
+        keyword_upload_dir = get_keyword_upload_dir(keyword_id)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"{user_id}_{timestamp}_asset_image.jpg"
-        file_path = os.path.join(UPLOAD_DIR, filename)
+        file_path = os.path.join(keyword_upload_dir, filename)
         
         async with aiofiles.open(file_path, "wb") as buffer:
             await buffer.write(file_content)
@@ -334,8 +375,8 @@ async def upload_photo_from_asset(
     user = db.query(User).filter(User.id == photo.user_id).first()
     user_nickname = user.nickname if user else "알 수 없는 사용자"
     
-    # 이미지 경로를 전체 URL로 변환
-    image_url = f"http://127.0.0.1:8000/{photo.image_path}" if photo.image_path else None
+    # 이미지 경로를 상대경로로 유지
+    image_url = photo.image_path if photo.image_path else None
     
     # photo.__dict__에서 image_path를 제거하고 새로운 image_url 사용
     photo_dict = photo.__dict__.copy()
@@ -376,8 +417,8 @@ async def get_photos(
         user = db.query(User).filter(User.id == photo.user_id).first()
         user_nickname = user.nickname if user else "알 수 없는 사용자"
         
-        # 이미지 경로를 전체 URL로 변환
-        image_url = f"http://127.0.0.1:8000/{photo.image_path}" if photo.image_path else None
+        # 이미지 경로를 상대경로로 유지
+        image_url = photo.image_path if photo.image_path else None
         
         # photo.__dict__에서 image_path를 제거하고 새로운 image_url 사용
         photo_dict = photo.__dict__.copy()
@@ -401,8 +442,8 @@ async def get_photo(photo_id: int, db: Session = Depends(get_db)):
     
     like_count = db.query(Like).filter(Like.photo_id == photo.id).count()
     
-    # 이미지 경로를 전체 URL로 변환
-    image_url = f"http://127.0.0.1:8000/{photo.image_path}" if photo.image_path else None
+    # 이미지 경로를 상대경로로 유지
+    image_url = photo.image_path if photo.image_path else None
     
     # photo.__dict__에서 image_path를 제거하고 새로운 image_url 사용
     photo_dict = photo.__dict__.copy()
@@ -453,6 +494,15 @@ async def unlike_photo(photo_id: int, user_id: int, db: Session = Depends(get_db
     db.commit()
     
     return {"message": "좋아요가 취소되었습니다."}
+
+@router.post("/migrate-existing")
+async def migrate_existing_photos_endpoint(db: Session = Depends(get_db)):
+    """기존 사진들을 키워드별 디렉토리로 마이그레이션합니다."""
+    try:
+        migrate_existing_photos(db)
+        return {"message": "기존 사진 마이그레이션이 완료되었습니다."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"마이그레이션 중 오류: {str(e)}")
 
 @router.delete("/{photo_id}")
 async def delete_photo(photo_id: int, db: Session = Depends(get_db)):
